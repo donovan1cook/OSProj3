@@ -8,11 +8,24 @@ int num_threads = DEFAULT_THREADS;
 int buffer_max_size = DEFAULT_BUFFER_SIZE;
 int scheduling_algo = DEFAULT_SCHED_ALGO;	
 
+typedef struct {
+    int file_descriptor;
+    char filename[MAXBUF];
+    int file_size;
+} request_t;
+
+request_t request_buffer[DEFAULT_BUFFER_SIZE];
+int buffer_head = 0;
+int buffer_tail = 0;
+int buffer_count = 0;
+
 //
 //	TODO: add code to create and manage the shared global buffer of requests
 //	HINT: You will need synchronization primitives.
 //		pthread_mutuex_t lock_var is a viable option.
 //
+
+
 
 //
 // Sends out HTTP response in case of errors
