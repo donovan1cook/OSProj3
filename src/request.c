@@ -23,6 +23,8 @@ pthread_mutex_t buffer_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t buffer_not_empty = PTHREAD_COND_INITIALIZER;
 pthread_cond_t buffer_not_full = PTHREAD_COND_INITIALIZER;
 
+extern int scheduling_algo; 
+
 //
 //	TODO: add code to create and manage the shared global buffer of requests
 //	HINT: You will need synchronization primitives.
@@ -163,6 +165,21 @@ void* thread_request_serve_static(void* arg)
         pthread_mutex_lock(&buffer_lock);
         while (buffer_count == 0) {
             pthread_cond_wait(&buffer_not_empty, &buffer_lock);
+        }
+
+        int job_index = buffer_head;
+
+        if (scheduling_algo ==1) {
+            int smallest = buffer_head;
+            for (int i = 0; i < buffer_count; i++) {
+                int spot = (buffer_head + i) % buffer_max_size;
+                if (request_buffer[spot].file_size < request_buffer[smallest].file_size) {
+                    smallest = spot;
+                }
+            }
+            job_index = smallest;
+        } else if (scheduling_algo == 2) {
+
         }
 
         request_t req = request_buffer[buffer_head];
