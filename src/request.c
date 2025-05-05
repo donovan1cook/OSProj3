@@ -12,6 +12,7 @@ typedef struct {
     int fd;
     char filename[MAXBUF];
     int file_size;
+    time_t arrival_time; 
 } request_t;
 
 request_t request_buffer[DEFAULT_BUFFER_SIZE];
@@ -170,6 +171,7 @@ void* thread_request_serve_static(void* arg)
         int job_index = buffer_head;
 
         if (scheduling_algo ==1) {
+            time_t now = time(NULL);
             int smallest = buffer_head;
             for (int i = 0; i < buffer_count; i++) {
                 int spot = (buffer_head + i) % buffer_max_size;
@@ -196,11 +198,28 @@ void* thread_request_serve_static(void* arg)
         } else if (scheduling_algo == 2) {
             int r = rand() % buffer_count;
             job_index = (buffer_head + r) % buffer_max_size;
+
+            // Fill in gap from taking one out
+            int i = job_index;
+            while (i != buffer_tail) {
+                int next = (i + 1) % buffer_max_size;
+                request_buffer[i] = request_buffer[next];
+                i = next;
+            }
+
+            // move tail 
+            buffer_tail = (buffer_tail - 1 + buffer_max_size) % buffer_max_size;
+            buffer_count--;
         }
 
-        request_t req = request_buffer[buffer_head];
-        buffer_head = (buffer_head + 1) % buffer_max_size;
-        buffer_count--;
+        request_t req;
+        if (scheduling_algo == 0) {
+            req = request_buffer[buffer_head];
+            buffer_head = (buffer_head + 1) % buffer_max_size;
+            buffer_count--;
+        } else {
+            req = request_buffer[job_index];  // already removed and shifted
+        }
 
         pthread_cond_signal(&buffer_not_full);
         pthread_mutex_unlock(&buffer_lock);
@@ -256,11 +275,11 @@ void request_handle(int fd) {
     }
     
     request_t req;
+    req.arrival_time = time(NULL);
     req.fd = fd;
     strcpy(req.filename, filename);
     req.file_size = sbuf.st_size;
 
-    // adds http request to buffer
     // locks
     pthread_mutex_lock(&buffer_lock);
     // checks if buffer is empyty
