@@ -9,7 +9,7 @@ int buffer_max_size = DEFAULT_BUFFER_SIZE;
 int scheduling_algo = DEFAULT_SCHED_ALGO;	
 
 typedef struct {
-    int file_descriptor;
+    int fd;
     char filename[MAXBUF];
     int file_size;
 } request_t;
@@ -158,6 +158,23 @@ void* thread_request_serve_static(void* arg)
 {
     // TODO: write code to actualy respond to HTTP requests
     // Pull from global buffer of requests
+
+    while (1) {
+        pthread_mutex_lock(&buffer_lock);
+        while (buffer_count == 0) {
+            pthread_cond_wait(&buffer_not_empty, &buffer_lock);
+        }
+
+        request_t req = request_buffer[buffer_head];
+        buffer_head = (buffer_head + 1) % buffer_max_size;
+        buffer_count--;
+
+        pthread_cond_signal(&buffer_not_full);
+        pthread_mutex_unlock(&buffer_lock);
+
+        request_serve_static(req.fd, req.filename, req.file_size);
+        close_or_die(req.fd);
+    }
 }
 
 //
@@ -199,20 +216,31 @@ void request_handle(int fd) {
     
 	// TODO: directory traversal mitigation	
 	// TODO: write code to add HTTP requests in the buffer
+
+    if (strstr(filename, "..") != NULL) {
+        request_error(fd, filename, "403", "Forbidden", "Directory Traversal Attempt");
+        return;
+    }
     
     request_t req;
     req.fd = fd;
     strcpy(req.filename, filename);
     req.file_size = sbuf.st_size;
 
+    // adds http request to buffer
+    // locks
     pthread_mutex_lock(&buffer_lock);
+    // checks if buffer is empyty
     while (buffer_count == buffer_max_size) {
         pthread_cond_wait(&buffer_not_full, &buffer_lock);
     }
+
     request_buffer[buffer_tail] = req;
     buffer_tail = (buffer_tail+1) % buffer_max_size;
     buffer_count++;
+    //shows buffer full
     pthread_cond_signal(&buffer_not_empty);
+    // unlocks
     pthread_mutex_unlock(&buffer_lock);
 
 
