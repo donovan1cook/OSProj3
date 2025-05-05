@@ -239,9 +239,11 @@ void request_handle(int fd) {
     char filename[MAXBUF], cgiargs[MAXBUF];
     
     // get the request type, file path and HTTP version
-    readline_or_die(fd, buf, MAXBUF);
-    sscanf(buf, "%s %s %s", method, uri, version);
-    printf("method:%s uri:%s version:%s\n", method, uri, version);
+    if (readline_or_die(fd, buf, MAXBUF) <= 0 ||
+    sscanf(buf, "%s %s %s", method, uri, version) != 3) {
+    request_error(fd, "unknown", "400", "Bad Request", "Malformed request line");
+    return;
+    }       
 
     // verify if the request type is GET or not
     if (strcasecmp(method, "GET")) {
