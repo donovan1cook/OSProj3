@@ -19,6 +19,10 @@ int buffer_head = 0;
 int buffer_tail = 0;
 int buffer_count = 0;
 
+pthread_mutex_t buffer_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t buffer_not_empty = PTHREAD_COND_INITIALIZER;
+pthread_cond_t buffer_not_full = PTHREAD_COND_INITIALIZER;
+
 //
 //	TODO: add code to create and manage the shared global buffer of requests
 //	HINT: You will need synchronization primitives.
@@ -195,6 +199,22 @@ void request_handle(int fd) {
     
 	// TODO: directory traversal mitigation	
 	// TODO: write code to add HTTP requests in the buffer
+    
+    request_t req;
+    req.fd = fd;
+    strcpy(req.filename, filename);
+    req.file_size = sbuf.st_size;
+
+    pthread_mutex_lock(&buffer_lock);
+    while (buffer_count == buffer_max_size) {
+        pthread_cond_wait(&buffer_not_full, &buffer_lock);
+    }
+    request_buffer[buffer_tail] = req;
+    buffer_tail = (buffer_tail+1) % buffer_max_size;
+    buffer_count++;
+    pthread_cond_signal(&buffer_not_empty);
+    pthread_mutex_unlock(&buffer_lock);
+
 
     } else {
 	request_error(fd, filename, "501", "Not Implemented", "server does not serve dynamic content request");
