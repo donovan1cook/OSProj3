@@ -178,8 +178,24 @@ void* thread_request_serve_static(void* arg)
                 }
             }
             job_index = smallest;
-        } else if (scheduling_algo == 2) {
 
+            request_t picked = request_buffer[job_index];
+
+            // Fill in gap from taking one out
+            int i = job_index;
+            while (i != buffer_tail) {
+                int next = (i + 1) % buffer_max_size;
+                request_buffer[i] = request_buffer[next];
+                i = next;
+            }
+
+            // move tail 
+            buffer_tail = (buffer_tail - 1 + buffer_max_size) % buffer_max_size;
+            buffer_count--;
+
+        } else if (scheduling_algo == 2) {
+            int r = rand() % buffer_count;
+            job_index = (buffer_head + r) % buffer_max_size;
         }
 
         request_t req = request_buffer[buffer_head];
